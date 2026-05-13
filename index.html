@@ -1,0 +1,290 @@
+<!doctype html> 
+<html lang="ru"> 
+<head> 
+    <meta charset="utf-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5Д Новости</title> 
+    <style>
+        :root { 
+            --primary: #c62828; 
+            --dark: #1a1a1a; 
+            --text: #333333; 
+            --bg: #f5f5f5; 
+            --white: #ffffff; 
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.5; }
+        
+        /* Шапка */
+        header { background-color: var(--dark); color: var(--white); position: sticky; top: 0; z-index: 100; }
+        .header-top { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 2rem; font-weight: 800; }
+        .logo span { color: var(--primary); }
+        .add-btn { background-color: var(--primary); color: white; border: none; padding: 10px 20px; font-size: 1rem; font-weight: 600; border-radius: 20px; cursor: pointer; }
+        
+        /* Лента новостей */
+        .main-container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .news-grid { display: grid; grid-template-columns: 1fr; gap: 25px; }
+        @media (min-width: 600px) { .news-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 900px) { .news-grid { grid-template-columns: repeat(3, 1fr); } }
+        
+        /* Карточка новости */
+        .news-card { background: var(--white); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; position: relative; }
+        .news-img { width: 100%; height: 200px; object-fit: cover; background-color: #e0e0e0; }
+        .news-content { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; }
+        .news-meta { font-size: 0.8rem; color: #777; margin-bottom: 8px; font-weight: 600; }
+        .news-title { font-size: 1.3rem; margin-bottom: 10px; color: var(--dark); }
+        .news-desc { font-size: 0.95rem; color: #555; white-space: pre-wrap; }
+        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+        .delete-btn:hover { background: var(--primary); }
+        .empty-state { text-align: center; padding: 60px 20px; color: #777; grid-column: 1 / -1; }
+        
+        /* Модальные окна (Общие стили) */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 200; backdrop-filter: blur(4px); }
+        .modal { background: var(--white); padding: 30px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .modal-title { margin-bottom: 20px; color: var(--dark); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 1rem; }
+        
+        /* Стилизация вывода ошибок пароля */
+        .error-message { color: var(--primary); font-size: 0.9rem; font-weight: 600; margin-top: 10px; display: none; }
+        
+        /* Кастомный выбор файлов */
+        .file-upload-input { width: 0.1px; height: 0.1px; opacity: 0; overflow: hidden; position: absolute; z-index: -1; }
+        .file-upload-label { display: flex; align-items: center; justify-content: center; gap: 10px; background-color: #f0f0f0; color: #555; border: 2px dashed #ccc; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s ease; text-align: center; }
+        .file-upload-label:hover { background-color: #e8e8e8; border-color: var(--primary); color: var(--primary); }
+        .file-name-text { display: block; margin-top: 5px; font-size: 0.85rem; color: #777; font-style: italic; word-break: break-all; }
+        
+        .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+        .btn-cancel { background: #eee; }
+        .btn-submit { background: var(--primary); color: white; }
+    </style>
+</head> 
+<body> 
+
+    <header>
+        <div class="header-top">
+            <div class="logo">5Д<span>Новости</span></div>
+            <button class="add-btn" id="openAuthBtn">+ Добавить новость</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <main class="news-grid" id="newsGrid">
+            <div class="empty-state" id="emptyState">
+                <h3>Лента новостей пуста</h3>
+                <p>Нажмите кнопку выше, чтобы опубликовать первую новость.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО 1: Проверка пароля -->
+    <div class="modal-overlay" id="authOverlay">
+        <div class="modal" style="max-width: 400px;">
+            <h3 class="modal-title">Доступ ограничен</h3>
+            <form id="authForm">
+                <div class="form-group">
+                    <label for="adminPassword">Введите пароль администратора</label>
+                    <input type="password" id="adminPassword" required placeholder="••••">
+                    <div class="error-message" id="authError">Неверный пароль. Попробуйте еще раз.</div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="closeAuthBtn">Отмена</button>
+                    <button type="submit" class="btn btn-submit">Войти</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО 2: Создание новости -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3 class="modal-title">Новая публикация</h3>
+            <form id="newsForm">
+                <div class="form-group">
+                    <label for="title">Заголовок</label>
+                    <input type="text" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">От кого</label>
+                    <input type="text" id="author" required>
+                </div>
+                <div class="form-group">
+                    <label>Обложка новости</label>
+                    <input type="file" id="imageFile" accept="image/*" class="file-upload-input">
+                    <label for="imageFile" class="file-upload-label">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <span>Выбрать фото из галереи</span>
+                    </label>
+                    <span id="fileName" class="file-name-text">Файл не выбран</span>
+                </div>
+                <div class="form-group">
+                    <label for="desc">Текст новости</label>
+                    <textarea id="desc" rows="5" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="closeModalBtn">Отмена</button>
+                    <button type="submit" class="btn btn-submit">Опубликовать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api/news';
+        
+        // Элементы авторизации
+        const openAuthBtn = document.getElementById('openAuthBtn');
+        const closeAuthBtn = document.getElementById('closeAuthBtn');
+        const authOverlay = document.getElementById('authOverlay');
+        const authForm = document.getElementById('authForm');
+        const adminPasswordInput = document.getElementById('adminPassword');
+        const authError = document.getElementById('authError');
+
+        // Элементы формы новости
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const newsForm = document.getElementById('newsForm');
+        const newsGrid = document.getElementById('newsGrid');
+        const emptyState = document.getElementById('emptyState');
+        const fileInput = document.getElementById('imageFile');
+        const fileNameDisplay = document.getElementById('fileName');
+
+        let pendingDeleteId = null; // Хранит ID новости, которую хотят удалить
+        let currentAction = 'add'; // 'add' или 'delete'
+
+        async function loadNews() {
+            try {
+                const res = await fetch(API_URL);
+                const newsList = await res.json();
+                renderNews(newsList);
+            } catch (err) {
+                console.error("Ошибка подключения к серверу:", err);
+            }
+        }
+
+        function renderNews(newsList) {
+            newsGrid.innerHTML = '';
+            if (newsList.length === 0) {
+                newsGrid.appendChild(emptyState);
+                emptyState.style.display = 'block';
+                return;
+            }
+            emptyState.style.display = 'none';
+
+            newsList.forEach(news => {
+                const article = document.createElement('article');
+                article.className = 'news-card';
+                const imgHtml = news.image ? `<img src="${news.image}" class="news-img">` : '';
+
+                article.innerHTML = `
+                    <button class="delete-btn" onclick="requestDelete(${news.id})">×</button>
+                    ${imgHtml}
+                    <div class="news-content">
+                        <div class="news-meta">Автор: ${escapeHtml(news.author)} • ${news.date}</div>
+                        <h3 class="news-title">${escapeHtml(news.title)}</h3>
+                        <p class="news-desc">${escapeHtml(news.desc)}</p>
+                    </div>
+                `;
+                newsGrid.appendChild(article);
+            });
+        }
+
+        function resetFileStatus() {
+            fileNameDisplay.textContent = 'Файл не выбран';
+            fileNameDisplay.style.color = '#777';
+        }
+
+        function escapeHtml(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+        // --- ЛОГИКА ОКНА ПАРОЛЯ ---
+        
+        // Открытие окна ввода пароля при нажатии на "+"
+        openAuthBtn.addEventListener('click', () => {
+            currentAction = 'add';
+            authOverlay.style.display = 'flex';
+            adminPasswordInput.focus();
+        });
+
+        // Запрос пароля при удалении новости
+        window.requestDelete = function(id) {
+            currentAction = 'delete';
+            pendingDeleteId = id;
+            authOverlay.style.display = 'flex';
+            adminPasswordInput.focus();
+        };
+
+        // Закрытие окна пароля
+        closeAuthBtn.addEventListener('click', () => {
+            authOverlay.style.display = 'none';
+            authForm.reset();
+            authError.style.display = 'none';
+            pendingDeleteId = null;
+        });
+
+        // Проверка введенного пароля
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (adminPasswordInput.value === '5555') {
+                authOverlay.style.display = 'none';
+                authForm.reset();
+                authError.style.display = 'none';
+
+                if (currentAction === 'add') {
+                    modalOverlay.style.display = 'flex';
+                } else if (currentAction === 'delete' && pendingDeleteId) {
+                    await fetch(`${API_URL}/${pendingDeleteId}`, { method: 'DELETE' });
+                    pendingDeleteId = null;
+                    loadNews();
+                }
+            } else {
+                authError.style.display = 'block';
+                adminPasswordInput.value = '';
+            }
+        });
+
+        // --- ЛОГИКА ФОРМЫ НОВОСТЕЙ ---
+        
+        closeModalBtn.addEventListener('click', () => { 
+            modalOverlay.style.display = 'none'; 
+            newsForm.reset(); 
+            resetFileStatus();
+        });
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                fileNameDisplay.textContent = `Выбран файл: ${this.files.name}`;
+                fileNameDisplay.style.color = 'green';
+            } else {
+                resetFileStatus();
+            }
+        });
+
+        newsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData();
+            formData.append('title', document.getElementById('title').value);
+            formData.append('author', document.getElementById('author').value);
+            formData.append('desc', document.getElementById('desc').value);
+            
+            if (fileInput.files.length > 0) {
+                formData.append('imageFile', fileInput.files);
+            }
+
+            await fetch(API_URL, { method: 'POST', body: formData });
+            
+            modalOverlay.style.display = 'none';
+            newsForm.reset();
+            resetFileStatus();
+            loadNews();
+        });
+
+        loadNews();
+    </script>
+</body> 
+</html>
+
